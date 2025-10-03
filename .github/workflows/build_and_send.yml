@@ -43,7 +43,8 @@ jobs:
       # 步骤 3: 【关键步骤】安装 Android SDK 和 NDK
       # 使用一个专门为安卓环境设计的 Action，更稳定可靠
       - name: 3. Setup Android SDK
-        uses: android-actions/setup-sdk@v3
+        # 正确的代码
+        uses: android-actions/setup-android@v3
         with:
           # 安装你指定的 NDK 版本
           ndk-version: "28.0.12433566"
