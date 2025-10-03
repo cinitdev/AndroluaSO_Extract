@@ -38,7 +38,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '17.0.14+7'
 
       # 步骤 3: 【关键步骤】安装 Android SDK 和 NDK
       # 使用一个专门为安卓环境设计的 Action，更稳定可靠
