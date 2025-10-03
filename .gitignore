@@ -1,0 +1,51 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+```
+# Android Studio
+.idea/
+.gradle/
+local.properties
+
+# Build outputs
+build/
+app/build/
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Logs
+*.log
+
+# NDK/CMake 中间文件
+**/obj/
+**/libs/*.so
+**/libs/*.a
+*.apk
+*.ap_
+*.dex
+*.class
+
+# Keystore files
+*.jks
+*.keystore
+
+# Others
+/out/
+/captures/
+/*.ipr
+/*.iws
+
+
