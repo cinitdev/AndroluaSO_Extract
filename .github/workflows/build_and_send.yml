@@ -47,7 +47,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           # 安装你指定的 NDK 版本
-          packages: "28.0.12433566"
+          packages: "ndk;28.0.12433566"
 
       # 步骤 4: 为 gradlew 脚本添加执行权限
       # 这是一个好习惯，可以避免因权限问题导致的构建失败
