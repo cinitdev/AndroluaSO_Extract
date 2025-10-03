@@ -1,0 +1,106 @@
+# Workflow 名称
+name: Build AndroLua Pro SO and Send to Telegram
+
+on:
+  # 允许手动触发 Workflow
+  workflow_dispatch:
+    inputs:
+      so_files_list:
+        description: '输入要提取的SO文件名 (用 | 隔开)'
+        required: true
+        default: 'libluajava.so' # 默认提取的文件
+  
+  # 当有代码推送到 main 分支时自动触发
+  push:
+    branches:
+      - master
+
+env:
+  # 压缩包的名称
+  ZIP_NAME: "compiled-so-files.zip"
+
+jobs:
+  build-and-deploy:
+    # 使用最新的 Ubuntu 系统
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 步骤 1: 检出你自己的项目代码
+      # actions/checkout@v4 是当前最新的稳定版本
+      - name: 1. Checkout Your Project
+        uses: actions/checkout@v4
+        with:
+          # `submodules: 'recursive'` 确保如果你的项目有子模块也能被完整拉取
+          submodules: 'recursive'
+
+      # 步骤 2: 设置 Java 环境为 JDK 17
+      - name: 2. Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 步骤 3: 【关键步骤】安装 Android SDK 和 NDK
+      # 使用一个专门为安卓环境设计的 Action，更稳定可靠
+      - name: 3. Setup Android SDK
+        uses: android-actions/setup-sdk@v3
+        with:
+          # 安装你指定的 NDK 版本
+          ndk-version: "28.0.12433566"
+
+      # 步骤 4: 为 gradlew 脚本添加执行权限
+      # 这是一个好习惯，可以避免因权限问题导致的构建失败
+      - name: 4. Grant execute permission to gradlew
+        run: chmod +x ./gradlew
+        
+      # 步骤 5: 使用 Gradle Wrapper 编译项目
+      # 这是安卓项目的标准编译方式
+      - name: 5. Build Project with Gradle
+        run: ./gradlew assembleDebug
+
+      # 步骤 6: 准备并从编译好的 APK 中提取 SO 文件
+      - name: 6. Prepare and Extract SO Files
+        env:
+          # 从手动触发的输入或默认值中获取要提取的文件列表
+          SO_FILES_TO_EXTRACT: ${{ github.event.inputs.so_files_list || 'libluajava.so' }}
+        run: |
+          # 自动查找 debug 目录下编译生成的 APK 文件
+          APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" -type f)
+          echo "Found APK at: $APK_PATH"
+
+          # 创建用于存放 SO 文件的目录结构
+          mkdir -p extracted_so/lib/arm64-v8a
+          mkdir -p extracted_so/lib/armeabi-v7a
+          
+          echo "SO files to extract (raw input): $SO_FILES_TO_EXTRACT"
+          
+          # 循环处理输入的文件列表（通过'|'分割）
+          for so_file in $(echo "$SO_FILES_TO_EXTRACT" | tr '|' ' '); do
+            echo "Extracting $so_file..."
+            # 从 APK 中解压指定文件到对应目录，如果找不到则打印提示
+            unzip -j "$APK_PATH" "lib/arm64-v8a/$so_file" -d extracted_so/lib/arm64-v8a || echo "$so_file not found in arm64-v8a"
+            unzip -j "$APK_PATH" "lib/armeabi-v7a/$so_file" -d extracted_so/lib/armeabi-v7a || echo "$so_file not found in armeabi-v7a"
+          done
+
+      # 步骤 7: 将提取出的 SO 文件压缩成 ZIP 包
+      - name: 7. Compress Extracted SO Files
+        run: |
+          cd extracted_so
+          zip -r ../${{ env.ZIP_NAME }} .
+          cd ..
+          echo "Compressed files into ${{ env.ZIP_NAME }}"
+
+      # 步骤 8: 将压缩包发送到 Telegram
+      - name: 8. Send Compressed File to Telegram
+        env:
+           # 获取本次运行提取的文件列表，用于消息通知
+           SO_FILES_LIST: ${{ github.event.inputs.so_files_list || 'libluajava.so' }}
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            AndroLua Pro SO 编译完成！
+            项目: ${{ github.repository }}
+            提取文件: ${{ env.SO_FILES_LIST }}
+          document: ${{ env.ZIP_NAME }}
