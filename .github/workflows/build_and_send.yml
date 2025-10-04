@@ -10,7 +10,6 @@ on:
         required: true
         default: 'libluajava.so'
   
-  # 当有代码推送到 master 分支时自动触发
   push:
     branches:
       - master
@@ -79,12 +78,9 @@ jobs:
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          # 【最终修正】: 指定格式为 html 并使用 html 标签
-          format: html
-          caption: |
-            <b>AndroLua Pro SO 编译完成！</b>
-            
-            <b>项目:</b> <code>${{ github.repository }}</code>
-            <b>提取文件:</b> <code>${{ env.REQUESTED_FILES_FORMATTED }}</code>
-            ${{ env.FAILED_FILES != '' && format('<b>提取失败:</b> <code>{0}</code>', env.FAILED_FILES) || '' }}
+          message: |
+            AndroLua Pro SO 编译完成！
+            项目: ${{ github.repository }}
+            提取文件: ${{ env.REQUESTED_FILES_FORMATTED }}
+            ${{ env.FAILED_FILES != '' && format('提取失败: {0}', env.FAILED_FILES) || '' }}
           document: ${{ env.ZIP_NAME }}
