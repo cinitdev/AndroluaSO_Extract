@@ -57,8 +57,6 @@
 | `TELEGRAM_BOT_TOKEN` | 填入你从 [@BotFather](https://t.me/BotFather) 获取的机器人 `Token`         |
 | `TELEGRAM_CHAT_ID`   | 填入你从 [@userinfobot](https://t.me/userinfobot) 获取的 `CHAT_ID`         |
 
-![添加 Secret 的示例图片](https://docs.github.com/assets/cb-126233/images/help/settings/actions-secrets-value.png)
-
 **完成以上设置后，你的项目就可以正常运行了！**
 
 ---
