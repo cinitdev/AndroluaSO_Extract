@@ -6,14 +6,14 @@ on:
   workflow_dispatch:
     inputs:
       so_files_list:
-        description: '输入要提取的SO文件名 (用|隔开)'
+        description: '输入要提取的SO文件名 (用 | 隔开)'
         required: true
         default: 'libluajava.so' # 默认提取的文件
   
   # 当有代码推送到 main 分支时自动触发
   push:
     branches:
-      - main
+      - master
 
 env:
   # 压缩包的名称
@@ -36,13 +36,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '17.0.14+7' # JDK 17 的主版本号即可
 
       # 步骤 3: 安装 Android SDK 和 NDK
       - name: 3. Setup Android SDK
-        uses: android-actions/setup-sdk@v3
+        uses: android-actions/setup-android@v3 # 这是正确的 Action
         with:
-          ndk-version: "28.0.12433566"
+          # 通过 packages 参数指定需要安装的组件
+          packages: "ndk;28.0.12433566"
 
       # 步骤 4: 为 gradlew 脚本添加执行权限
       - name: 4. Grant execute permission to gradlew
@@ -55,7 +56,7 @@ jobs:
       # 步骤 6: 【重大修改】提取SO文件并记录成功与失败的列表
       - name: 6. Extract SO Files and Record Results
         run: |
-          # 查找编译产物 APK
+          # 查找编译产物 APK，如果找不到则报错退出
           APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" -type f)
           if [[ -z "$APK_PATH" ]]; then
             echo "::error::编译后找不到 APK 文件！"
@@ -67,7 +68,7 @@ jobs:
           mkdir -p extracted_so/lib/arm64-v8a
           mkdir -p extracted_so/lib/armeabi-v7a
           
-          # 获取用户输入并格式化 (将'|'替换为空格)
+          # 获取用户输入并格式化 (将'|'替换为空格)，然后存入环境变量供后续步骤使用
           SO_FILES_INPUT="${{ github.event.inputs.so_files_list || 'libluajava.so' }}"
           FORMATTED_LIST=$(echo "$SO_FILES_INPUT" | tr '|' ' ')
           echo "REQUESTED_FILES_FORMATTED=$FORMATTED_LIST" >> $GITHUB_ENV
@@ -77,10 +78,10 @@ jobs:
           
           echo "开始处理请求的文件: $FORMATTED_LIST"
           for so_file in $FORMATTED_LIST; do
-            # 使用 unzip -l 和 grep 在不解压的情况下检查文件是否存在
-            if unzip -l "$APK_PATH" | grep -q "lib/arm64-v8a/$so_file" || unzip -l "$APK_PATH" | grep -q "lib/armeabi-v7a/$so_file"; then
+            # 使用 unzip -l 和 grep 在不解压的情况下检查文件是否存在于 APK 中
+            if unzip -l "$APK_PATH" | grep -qE "lib/(arm64-v8a|armeabi-v7a)/$so_file"; then
               echo "找到并提取 '$so_file'..."
-              # 从两个可能的目录中提取文件，忽略其中一个可能不存在的错误
+              # 从两个可能的目录中提取文件，忽略其中一个可能不存在的错误 (2>/dev/null)
               unzip -j "$APK_PATH" "lib/arm64-v8a/$so_file" -d extracted_so/lib/arm64-v8a 2>/dev/null || true
               unzip -j "$APK_PATH" "lib/armeabi-v7a/$so_file" -d extracted_so/lib/armeabi-v7a 2>/dev/null || true
             else
@@ -102,13 +103,15 @@ jobs:
           cd ..
           echo "Compressed files into ${{ env.ZIP_NAME }}"
 
-      # 步骤 8: 【重大修改】构造动态消息并发送到 Telegram
+      # 步骤 8: 【重大修改】构造动态消息并作为文件的 Caption 发送到 Telegram
       - name: 8. Send Compressed File to Telegram
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           # 将消息作为文件的说明文字（Caption），实现消息和文件合并发送
+          # 1. 自动将'|'替换为空格显示
+          # 2. 只有在 FAILED_FILES 变量不为空时，才显示“提取失败”这一行
           message: |
             AndroLua Pro SO 编译完成！
             项目: ${{ github.repository }}
