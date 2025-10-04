@@ -47,13 +47,14 @@ jobs:
           APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" -type f)
           if [[ -z "$APK_PATH" ]]; then echo "::error::编译后找不到 APK 文件！"; exit 1; fi
           echo "Found APK at: $APK_PATH"
-          mkdir -p extracted_so/lib/arm64-v8a extracted_so/lib/armeabi-v7a
+          mkdir -p extracted_so/arm64-v8a extracted_so/armeabi-v7a
+          
           SO_FILES_INPUT="${{ github.event.inputs.so_files_list || '' }}"
 
           if [[ -z "$SO_FILES_INPUT" ]]; then
             echo "输入为空，提取所有 SO 文件..."
-            unzip -o "$APK_PATH" "lib/arm64-v8a/*.so" -d extracted_so/lib/arm64-v8a
-            unzip -o "$APK_PATH" "lib/armeabi-v7a/*.so" -d extracted_so/lib/armeabi-v7a
+            unzip -j -o "$APK_PATH" "lib/arm64-v8a/*.so" -d extracted_so/arm64-v8a
+            unzip -j -o "$APK_PATH" "lib/armeabi-v7a/*.so" -d extracted_so/armeabi-v7a
             
             EXTRACTED_FILES=$(find extracted_so -name "*.so" -exec basename {} \; | sort -u | tr '\n' ' ')
             FORMATTED_LIST=$(echo "$EXTRACTED_FILES" | sed 's/ *$//g')
@@ -66,8 +67,8 @@ jobs:
             FAILED_FILES_LIST=""
             for so_file in $FORMATTED_LIST; do
               if unzip -l "$APK_PATH" | grep -qE "lib/(arm64-v8a|armeabi-v7a)/$so_file"; then
-                unzip -j "$APK_PATH" "lib/arm64-v8a/$so_file" -d extracted_so/lib/arm64-v8a 2>/dev/null || true
-                unzip -j "$APK_PATH" "lib/armeabi-v7a/$so_file" -d extracted_so/lib/armeabi-v7a 2>/dev/null || true
+                unzip -j "$APK_PATH" "lib/arm64-v8a/$so_file" -d extracted_so/arm64-v8a 2>/dev/null || true
+                unzip -j "$APK_PATH" "lib/armeabi-v7a/$so_file" -d extracted_so/armeabi-v7a 2>/dev/null || true
               else
                 FAILED_FILES_LIST="$FAILED_FILES_LIST $so_file"
               fi
