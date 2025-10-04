@@ -1,13 +1,16 @@
+# Workflow 名称
 name: Build AndroLua Pro SO and Send to Telegram
 
 on:
+  # 允许手动触发 Workflow
   workflow_dispatch:
     inputs:
       so_files_list:
-        description: '输入要提取的SO文件名 (用|隔开)'
+        description: '输入要提取的SO文件名 (用 | 隔开)'
         required: true
         default: 'libluajava.so'
   
+  # 当有代码推送到 master 分支时自动触发
   push:
     branches:
       - master
@@ -54,14 +57,11 @@ jobs:
           FORMATTED_LIST=$(echo "$SO_FILES_INPUT" | tr '|' ' ')
           echo "REQUESTED_FILES_FORMATTED=$FORMATTED_LIST" >> $GITHUB_ENV
           FAILED_FILES_LIST=""
-          echo "开始处理请求的文件: $FORMATTED_LIST"
           for so_file in $FORMATTED_LIST; do
             if unzip -l "$APK_PATH" | grep -qE "lib/(arm64-v8a|armeabi-v7a)/$so_file"; then
-              echo "找到并提取 '$so_file'..."
               unzip -j "$APK_PATH" "lib/arm64-v8a/$so_file" -d extracted_so/lib/arm64-v8a 2>/dev/null || true
               unzip -j "$APK_PATH" "lib/armeabi-v7a/$so_file" -d extracted_so/lib/armeabi-v7a 2>/dev/null || true
             else
-              echo "::warning::在 APK 中找不到 '$so_file'。"
               FAILED_FILES_LIST="$FAILED_FILES_LIST $so_file"
             fi
           done
@@ -73,16 +73,18 @@ jobs:
           cd extracted_so
           zip -r ../${{ env.ZIP_NAME }} .
           cd ..
-          echo "Compressed files into ${{ env.ZIP_NAME }}"
 
       - name: 8. Send File with Caption to Telegram
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          # 【最终修正】: 指定格式为 html 并使用 html 标签
+          format: html
           caption: |
-            AndroLua Pro SO 编译完成！
-            项目: ${{ github.repository }}
-            提取文件: ${{ env.REQUESTED_FILES_FORMATTED }}
-            ${{ env.FAILED_FILES != '' && format('提取失败: {0}', env.FAILED_FILES) || '' }}
+            <b>AndroLua Pro SO 编译完成！</b>
+            
+            <b>项目:</b> <code>${{ github.repository }}</code>
+            <b>提取文件:</b> <code>${{ env.REQUESTED_FILES_FORMATTED }}</code>
+            ${{ env.FAILED_FILES != '' && format('<b>提取失败:</b> <code>{0}</code>', env.FAILED_FILES) || '' }}
           document: ${{ env.ZIP_NAME }}
