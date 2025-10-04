@@ -3,12 +3,12 @@ AndroLua SO 文件自动编译与提取
 这个项目是为那些希望在云端自动构建和获取最新 .so 文件的开发者设计的。
 ✨ 功能特性
  * ☁️ 云端自动编译: 无需配置本地安卓开发环境，每次提交代码或手动触发即可在 GitHub 云端服务器上完成编译。
- * 🎯 动态文件提取: 可在手动触发时，自定义需要提取的一个或多个 .so 文件名。
+ * 📦 两种提取模式: 手动触发时，可以精确指定需要提取的一个或多个 .so 文件；如果留空，则会自动提取 APK 中所有的 .so 文件。
  * 🤖 智能 Telegram 通知: 使用 Pyrogram 发送媒体消息，将编译产物（ZIP压缩包）和详细的编译信息整合在一条消息中，界面美观且信息清晰。
- * ⚠️ 失败报告: 如果你请求的某个 .so 文件在编译产物（APK）中不存在，最终的通知消息会明确指出具体是哪个文件提取失败了。
+ * ⚠️ 失败报告: 当你按需提取某个 .so 文件但它在编译产物（APK）中不存在时，最终的通知消息会明确指出具体是哪个文件提取失败了。
  * 🚀 双重触发机制:
    * 手动触发: 可以在 GitHub Actions 页面手动运行，并传入自定义参数。
-   * 自动触发: 当有代码 push 到 master 分支时，会自动使用默认参数运行。
+   * 自动触发: 当有代码 push 到 master 分支时，会自动提取全部 .so 文件。
 🚀 快速开始 (Fork 用户必读)
 如果你 Fork 了本项目，你需要完成以下设置才能让 GitHub Actions 正常工作。
 第一步: 获取 Telegram 必要凭证
@@ -44,14 +44,14 @@ AndroLua SO 文件自动编译与提取
  * 进入你的仓库主页，点击上方的 Actions 标签页。
  * 在左侧列表中，点击 Build AndroLua Pro SO and Send to Telegram。
  * 在右侧，你会看到一个 "This workflow has a workflow_dispatch event" 的提示，点击 Run workflow 下拉按钮。
- * 在 输入要提取的SO文件名 (用 | 隔开) 输入框中，填入你想要提取的文件名。
-   * 提取单个文件: libluajava.so
-   * 提取多个文件: libluajava.so|liblfs.so|libsqlite3.so (文件名之间用 | 分隔)
- * 点击绿色的 Run workflow 按钮，等待任务完成即可在 Telegram 收到消息。
+ * 在 输入要提取的SO文件名(用|隔开)，留空则提取全部 输入框中，根据你的需求操作：
+   * 提取全部 .so 文件: 将输入框保持为空，直接点击绿色的 "Run workflow" 按钮。
+   * 提取指定 .so 文件: 填入文件名。例如：
+     * 提取单个: libluajava.so
+     * 提取多个: libluajava.so|liblfs.so|libsqlite3.so (文件名之间用 | 分隔)
+ * 点击 Run workflow 按钮，等待任务完成即可在 Telegram 收到消息。
 方式二：自动触发
-当你向 master 分支 push 任何代码时，工作流会自动运行。在这种情况下，它会使用在 .github/workflows/build_and_send.yml 文件中预设的默认值 (libluajava.so) 来提取文件。
+当你向 master 分支 push 任何代码时，工作流会自动运行。在这种情况下，它会自动提取 APK 中所有的 .so 文件。
 📁 项目文件结构
  * /.github/workflows/build_and_send.yml: GitHub Actions 的核心配置文件，定义了所有的编译和自动化步骤。
  * /send_telegram_message.py: 使用 Pyrogram 库编写的 Python 脚本，专门负责构造消息内容并将其发送到 Telegram。
-📄 许可
-本项目采用 MIT License 授权。
