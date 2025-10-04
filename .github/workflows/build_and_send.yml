@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       so_files_list:
-        description: '输入要提取的SO文件名 (用 | 隔开)'
-        required: true
-        default: 'libluajava.so'
+        description: '输入要提取的SO文件名(用|隔开)，留空则提取全部'
+        required: false
+        default: ''
   
   push:
     branches:
       - master
 
 env:
-  ZIP_NAME: "compiled-so-files.zip"
+  ZIP_NAME: "Extract_SO.zip"
 
 jobs:
   build-and-deploy:
@@ -45,22 +45,37 @@ jobs:
         id: extract
         run: |
           APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" -type f)
-          if [[ -z "$APK_PATH" ]]; then exit 1; fi
+          if [[ -z "$APK_PATH" ]]; then echo "::error::编译后找不到 APK 文件！"; exit 1; fi
+          echo "Found APK at: $APK_PATH"
           mkdir -p extracted_so/lib/arm64-v8a extracted_so/lib/armeabi-v7a
-          SO_FILES_INPUT="${{ github.event.inputs.so_files_list || 'libluajava.so' }}"
-          FORMATTED_LIST=$(echo "$SO_FILES_INPUT" | tr '|' ' ')
-          echo "formatted_list=$FORMATTED_LIST" >> $GITHUB_OUTPUT
-          FAILED_FILES_LIST=""
-          for so_file in $FORMATTED_LIST; do
-            if unzip -l "$APK_PATH" | grep -qE "lib/(arm64-v8a|armeabi-v7a)/$so_file"; then
-              unzip -j "$APK_PATH" "lib/arm64-v8a/$so_file" -d extracted_so/lib/arm64-v8a 2>/dev/null || true
-              unzip -j "$APK_PATH" "lib/armeabi-v7a/$so_file" -d extracted_so/lib/armeabi-v7a 2>/dev/null || true
-            else
-              FAILED_FILES_LIST="$FAILED_FILES_LIST $so_file"
-            fi
-          done
-          FAILED_FILES_TRIMMED=$(echo "$FAILED_FILES_LIST" | sed 's/^ *//g' | sed 's/ *$//g')
-          echo "failed_files=$FAILED_FILES_TRIMMED" >> $GITHUB_OUTPUT
+          SO_FILES_INPUT="${{ github.event.inputs.so_files_list || '' }}"
+
+          if [[ -z "$SO_FILES_INPUT" ]]; then
+            echo "输入为空，提取所有 SO 文件..."
+            unzip -o "$APK_PATH" "lib/arm64-v8a/*.so" -d extracted_so/lib/arm64-v8a
+            unzip -o "$APK_PATH" "lib/armeabi-v7a/*.so" -d extracted_so/lib/armeabi-v7a
+            
+            EXTRACTED_FILES=$(find extracted_so -name "*.so" -exec basename {} \; | sort -u | tr '\n' ' ')
+            FORMATTED_LIST=$(echo "$EXTRACTED_FILES" | sed 's/ *$//g')
+
+            echo "formatted_list=全部 (${FORMATTED_LIST})" >> $GITHUB_OUTPUT
+            echo "failed_files=" >> $GITHUB_OUTPUT
+          else
+            echo "按需提取指定文件..."
+            FORMATTED_LIST=$(echo "$SO_FILES_INPUT" | tr '|' ' ')
+            FAILED_FILES_LIST=""
+            for so_file in $FORMATTED_LIST; do
+              if unzip -l "$APK_PATH" | grep -qE "lib/(arm64-v8a|armeabi-v7a)/$so_file"; then
+                unzip -j "$APK_PATH" "lib/arm64-v8a/$so_file" -d extracted_so/lib/arm64-v8a 2>/dev/null || true
+                unzip -j "$APK_PATH" "lib/armeabi-v7a/$so_file" -d extracted_so/lib/armeabi-v7a 2>/dev/null || true
+              else
+                FAILED_FILES_LIST="$FAILED_FILES_LIST $so_file"
+              fi
+            done
+            FAILED_FILES_TRIMMED=$(echo "$FAILED_FILES_LIST" | sed 's/^ *//g' | sed 's/ *$//g')
+            echo "formatted_list=$FORMATTED_LIST" >> $GITHUB_OUTPUT
+            echo "failed_files=$FAILED_FILES_TRIMMED" >> $GITHUB_OUTPUT
+          fi
 
       - name: 7. Compress Extracted SO Files
         id: compress
@@ -88,12 +103,10 @@ jobs:
       - name: 10. Send File via Pyrogram
         if: steps.compress.outputs.should_send == 'true'
         env:
-          # 从 GitHub Secrets 中获取安全凭证
           PYROGRAM_API_ID: ${{ secrets.PYROGRAM_API_ID }}
           PYROGRAM_API_HASH: ${{ secrets.PYROGRAM_API_HASH }}
           PYROGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          # 从前面的步骤中获取动态信息
           FILE_PATH: ${{ env.ZIP_NAME }}
           REPO_NAME: ${{ github.repository }}
           REQUESTED_FILES: ${{ steps.extract.outputs.formatted_list }}
