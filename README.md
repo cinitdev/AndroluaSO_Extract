@@ -14,17 +14,17 @@ AndroLua SO 文件自动编译与提取
 第一步: 获取 Telegram 必要凭证
 工作流需要通过 Telegram 的官方 API 和机器人 API 来发送消息，因此你需要准备以下四样东西：
  * API_ID 和 API_HASH
-   * 访问 my.telegram.org 并登录你的 Telegram 账号。
+   * 访问 [my.telegram.org](my.telegram.org) 并登录你的 Telegram 账号。
    * 点击 "API development tools"。
    * 填写一个应用名称（任意填写，如 MyWorkflowBot），然后你就能得到 api_id 和 api_hash。
  * BOT_TOKEN (机器人令牌)
-   * 在 Telegram 中搜索 @BotFather 并与他开始对话。
+   * 在 Telegram 中搜索 [@BotFather](https://t.me/BotFather) 并与他开始对话。
    * 发送 /newbot 命令来创建一个新的机器人。
    * 按照提示为你的机器人命名后，BotFather 会给你一长串的 Token，这就是你的 BOT_TOKEN。
    * 重要: 创建好机器人后，记得点击 "Start" 启动一下你的机器人。
  * CHAT_ID (聊天 ID)
    * 这是你希望机器人发送消息的目标地。它可以是你的个人账号、群组或频道的 ID。
-   * 获取方法: 在 Telegram 中搜索 @userinfobot，与他开始对话，它会立即返回你的个人账号 ID，即为 CHAT_ID。
+   * 获取方法: 在 Telegram 中搜索 [@userinfobot](https://t.me/userinfobot)，与他开始对话，它会立即返回你的个人账号 ID，即为 CHAT_ID。
    * 注意: 如果你想让机器人发送消息到群组，你需要先将机器人添加到群组中。
 第二步: 在你的 GitHub 仓库中设置 Secrets
 为了安全地存储你的凭证，你需要将它们添加到你的 GitHub 仓库的 Secrets 中。
