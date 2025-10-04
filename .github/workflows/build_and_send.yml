@@ -1,8 +1,6 @@
-# Workflow 名称
-name: Build AndroLua Pro SO and Send to Telegram
+name: Build AndroLua Pro SO and Send to Telegram (Pyrogram)
 
 on:
-  # 允许手动触发 Workflow
   workflow_dispatch:
     inputs:
       so_files_list:
@@ -44,17 +42,14 @@ jobs:
         run: ./gradlew assembleDebug
 
       - name: 6. Extract SO Files and Record Results
+        id: extract
         run: |
           APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" -type f)
-          if [[ -z "$APK_PATH" ]]; then
-            echo "::error::编译后找不到 APK 文件！"
-            exit 1
-          fi
-          echo "Found APK at: $APK_PATH"
+          if [[ -z "$APK_PATH" ]]; then exit 1; fi
           mkdir -p extracted_so/lib/arm64-v8a extracted_so/lib/armeabi-v7a
           SO_FILES_INPUT="${{ github.event.inputs.so_files_list || 'libluajava.so' }}"
           FORMATTED_LIST=$(echo "$SO_FILES_INPUT" | tr '|' ' ')
-          echo "REQUESTED_FILES_FORMATTED=$FORMATTED_LIST" >> $GITHUB_ENV
+          echo "formatted_list=$FORMATTED_LIST" >> $GITHUB_OUTPUT
           FAILED_FILES_LIST=""
           for so_file in $FORMATTED_LIST; do
             if unzip -l "$APK_PATH" | grep -qE "lib/(arm64-v8a|armeabi-v7a)/$so_file"; then
@@ -65,22 +60,42 @@ jobs:
             fi
           done
           FAILED_FILES_TRIMMED=$(echo "$FAILED_FILES_LIST" | sed 's/^ *//g' | sed 's/ *$//g')
-          echo "FAILED_FILES=$FAILED_FILES_TRIMMED" >> $GITHUB_ENV
+          echo "failed_files=$FAILED_FILES_TRIMMED" >> $GITHUB_OUTPUT
 
       - name: 7. Compress Extracted SO Files
+        id: compress
         run: |
           cd extracted_so
-          zip -r ../${{ env.ZIP_NAME }} .
-          cd ..
+          if [ -z "$(ls -A .)" ]; then
+            echo "没有提取到任何文件，跳过发送。"
+            echo "should_send=false" >> $GITHUB_OUTPUT
+          else
+            zip -r ../${{ env.ZIP_NAME }} .
+            cd ..
+            echo "should_send=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: 8. Send File with Caption to Telegram
-        uses: appleboy/telegram-action@master
+      - name: 8. Set up Python environment
+        if: steps.compress.outputs.should_send == 'true'
+        uses: actions/setup-python@v5
         with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: |
-            AndroLua Pro SO 编译完成！
-            项目: ${{ github.repository }}
-            提取文件: ${{ env.REQUESTED_FILES_FORMATTED }}
-            ${{ env.FAILED_FILES != '' && format('提取失败: {0}', env.FAILED_FILES) || '' }}
-          document: ${{ env.ZIP_NAME }}
+          python-version: '3.10'
+
+      - name: 9. Install Pyrogram
+        if: steps.compress.outputs.should_send == 'true'
+        run: pip install pyrogram tgcrypto
+
+      - name: 10. Send File via Pyrogram
+        if: steps.compress.outputs.should_send == 'true'
+        env:
+          # 从 GitHub Secrets 中获取安全凭证
+          PYROGRAM_API_ID: ${{ secrets.PYROGRAM_API_ID }}
+          PYROGRAM_API_HASH: ${{ secrets.PYROGRAM_API_HASH }}
+          PYROGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 从前面的步骤中获取动态信息
+          FILE_PATH: ${{ env.ZIP_NAME }}
+          REPO_NAME: ${{ github.repository }}
+          REQUESTED_FILES: ${{ steps.extract.outputs.formatted_list }}
+          FAILED_FILES: ${{ steps.extract.outputs.failed_files }}
+        run: python send_telegram_message.py
